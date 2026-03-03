@@ -6,10 +6,8 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.command.arguments.EntityArgumentType;
 import net.minecraft.entity.Entity;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.text.LiteralText;
 import org.apache.logging.log4j.LogManager;
@@ -62,10 +60,6 @@ public class RelaySpeedrun implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(Relay::init);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> Relay.save());
         ServerTickEvents.END_SERVER_TICK.register(Relay::tick);
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            sender.sendPacket(new TitleS2CPacket(0, 3, 0));
-            Relay.join(handler.player);
-        });
     }
 
     private static int handleStart(ServerCommandSource source) {
