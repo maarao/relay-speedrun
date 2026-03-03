@@ -12,5 +12,11 @@ public interface HungerManagerMixin {
     
     @Accessor("exhaustion")
     void setExhaustion(float exhaustion);
+
+    @Accessor("foodSaturationLevel")
+    float getFoodSaturationLevel();
+
+    @Accessor("foodSaturationLevel")
+    void setFoodSaturationLevel(float foodSaturationLevel);
     
 }

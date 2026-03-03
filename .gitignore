@@ -1,0 +1,11 @@
+# gradle
+build/
+.gradle/
+
+# ide
+.idea/
+out/
+*.iml
+
+# local toolchains
+.jdks/

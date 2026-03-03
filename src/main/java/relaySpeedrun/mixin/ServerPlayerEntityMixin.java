@@ -1,17 +1,17 @@
 package relaySpeedrun.mixin;
 
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.nbt.CompoundTag;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-@Mixin(ServerPlayerEntity.class)
+@Mixin(PlayerEntity.class)
 public interface ServerPlayerEntityMixin {
     
-    @Invoker("setLeftShoulderNbt")
-    void relay_speedrun$setLeftShoulderNbt(NbtCompound leftShoulderNbt);
+    @Invoker("setShoulderEntityLeft")
+    void relay_speedrun$setLeftShoulderNbt(CompoundTag leftShoulderNbt);
     
-    @Invoker("setRightShoulderNbt")
-    void relay_speedrun$setRightShoulderNbt(NbtCompound rightShoulderNbt);
+    @Invoker("setShoulderEntityRight")
+    void relay_speedrun$setRightShoulderNbt(CompoundTag rightShoulderNbt);
     
 }
