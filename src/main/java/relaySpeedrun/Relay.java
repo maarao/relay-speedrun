@@ -193,7 +193,9 @@ public class Relay {
                 }
             case RUNNING:
             case PAUSING:
-                makeSpectator(player);
+                if (player != current) {
+                    makeSpectator(player);
+                }
                 break;
             default:
                 break;
@@ -201,6 +203,12 @@ public class Relay {
     }
 
     public static void start() {
+        // Seed known players so first tick does not misclassify current participants as fresh joins.
+        knownPlayers.clear();
+        for (ServerPlayerEntity player : players) {
+            knownPlayers.add(player.getUuid());
+        }
+
         for (ServerPlayerEntity player : players) {
             makeSpectator(player);
         }
