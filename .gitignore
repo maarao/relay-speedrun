@@ -9,3 +9,8 @@ out/
 
 # local toolchains
 .jdks/
+/bin
+/test
+
+# macOS
+.DS_Store
