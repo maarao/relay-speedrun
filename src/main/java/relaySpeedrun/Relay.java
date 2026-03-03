@@ -46,8 +46,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 import static relaySpeedrun.RelaySpeedrun.LOGGER;
@@ -61,6 +63,7 @@ public class Relay {
 
     private static State state = State.BEFORE_START;
     private static List<ServerPlayerEntity> players;
+    private static final Set<UUID> knownPlayers = new HashSet<UUID>();
     private static ServerPlayerEntity current;
     private static UUID currentPlayerUuid;
     private static Text currentPlayerName;
@@ -81,6 +84,10 @@ public class Relay {
     public static void init(MinecraftServer server) {
         PlayerManager playerManager = server.getPlayerManager();
         players = playerManager.getPlayerList();
+        knownPlayers.clear();
+        for (ServerPlayerEntity player : players) {
+            knownPlayers.add(player.getUuid());
+        }
 
         scoreboard = server.getScoreboard();
         timerObjective = scoreboard.getObjective("timer");
@@ -242,6 +249,12 @@ public class Relay {
     public static void tick(MinecraftServer server) {
         if (!state.isTicking()) {
             return;
+        }
+
+        for (ServerPlayerEntity player : players) {
+            if (knownPlayers.add(player.getUuid())) {
+                join(player);
+            }
         }
 
         rta++;
