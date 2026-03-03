@@ -3,153 +3,150 @@ package relaySpeedrun;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.command.argument.EntityArgumentType;
+import net.minecraft.command.arguments.EntityArgumentType;
 import net.minecraft.entity.Entity;
-import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.TeleportTarget;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import net.minecraft.text.LiteralText;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
 public class RelaySpeedrun implements ModInitializer {
-    
+
     public static final String MOD_ID = "relay-speedrun";
-    
-    public static final Logger LOGGER = LoggerFactory.getLogger("Relay Speedrun");
-    
+
+    public static final Logger LOGGER = LogManager.getLogger("Relay Speedrun");
+
     @Override
     public void onInitialize() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(literal("relay").then(literal("start").executes(context -> {
-                ServerCommandSource source = context.getSource();
-                return switch (Relay.getCurrentState()) {
-                    case BEFORE_START -> {
-                        if (source.getServer().getPlayerManager().getPlayerList().isEmpty()) {
-                            source.sendMessage(Text.literal("Relay cannot start because there is no players"));
-                            yield 0;
-                        }
-                        
-                        Relay.start();
-                        yield 1;
-                    }
-                    case RUNNING, PAUSING, FORCED_PAUSING -> {
-                        source.sendMessage(Text.literal("Relay has already started"));
-                        yield 0;
-                    }
-                    case ENDED -> {
-                        source.sendMessage(Text.literal("Relay has already ended"));
-                        yield 0;
-                    }
-                };
-            })).then(literal("stop").executes(context -> {
-                ServerCommandSource source = context.getSource();
-                return switch (Relay.getCurrentState()) {
-                    case BEFORE_START -> {
-                        source.sendMessage(Text.literal("Relay has not started yet"));
-                        yield 0;
-                    }
-                    case RUNNING, PAUSING, FORCED_PAUSING -> {
-                        Relay.stop();
-                        yield 1;
-                    }
-                    case ENDED -> {
-                        source.sendMessage(Text.literal("Relay has already ended"));
-                        yield 0;
-                    }
-                };
-            })).then(literal("pause").executes(context -> {
-                ServerCommandSource source = context.getSource();
-                return switch (Relay.getCurrentState()) {
-                    case BEFORE_START -> {
-                        source.sendMessage(Text.literal("Relay has not started yet"));
-                        yield 0;
-                    }
-                    case RUNNING -> {
-                        Relay.pause();
-                        yield 1;
-                    }
-                    case PAUSING, FORCED_PAUSING -> {
-                        source.sendMessage(Text.literal("Relay has already paused"));
-                        yield 0;
-                    }
-                    case ENDED -> {
-                        source.sendMessage(Text.literal("Relay has already ended"));
-                        yield 0;
-                    }
-                };
-            })).then(literal("resume").executes(context -> {
-                ServerCommandSource source = context.getSource();
-                return switch (Relay.getCurrentState()) {
-                    case BEFORE_START -> {
-                        source.sendMessage(Text.literal("Relay has not started yet"));
-                        yield 0;
-                    }
-                    case RUNNING -> {
-                        source.sendMessage(Text.literal("Relay is already running"));
-                        yield 0;
-                    }
-                    case PAUSING -> {
-                        Relay.resume();
-                        yield 1;
-                    }
-                    case FORCED_PAUSING -> {
-                        source.sendMessage(Text.literal("Relay cannot resume because the current player is not online"));
-                        yield 0;
-                    }
-                    case ENDED -> {
-                        source.sendMessage(Text.literal("Relay has already ended"));
-                        yield 0;
-                    }
-                };
-            })).then(literal("countdown").then(literal("get").executes(context -> {
-                context.getSource().sendMessage(Text.literal("Counting down from " + Relay.countdown));
-                return Relay.countdown;
-            })).then(literal("set").then(argument("countdown", IntegerArgumentType.integer(0)).executes(context -> {
-                Relay.countdown = IntegerArgumentType.getInteger(context, "countdown");
-                context.getSource().sendMessage(Text.literal("Countdown set to " + Relay.countdown));
-                return 1;
-            })))));
-            //@formatter:off
-            dispatcher.register(literal("setvelocity").then(argument("entity", EntityArgumentType.entity()).then(argument("velocityX",
-              DoubleArgumentType.doubleArg()).then(argument("velocityY", DoubleArgumentType.doubleArg()).then(argument(
-              "velocityZ",
-              DoubleArgumentType.doubleArg()).executes(context -> {
-                Entity entity = EntityArgumentType.getEntity(context, "entity");
-                if (!(entity.getEntityWorld() instanceof ServerWorld serverWorld)) return 0;
-                entity.teleportTo(new TeleportTarget(
-                  serverWorld,
-                  new Vec3d(entity.getX(), entity.getY(), entity.getZ()),
-                  new Vec3d(
-                    DoubleArgumentType.getDouble(context, "velocityX"),
-                    DoubleArgumentType.getDouble(context, "velocityY"),
-                    DoubleArgumentType.getDouble(context, "velocityZ")),
-                  entity.getYaw(),
-                  entity.getPitch(),
-                  TeleportTarget.NO_OP));
-                return 1;
-            }))))));
-            //@formatter:on
+        CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> {
+            dispatcher.register(literal("relay")
+                .then(literal("start").executes(context -> handleStart(context.getSource())))
+                .then(literal("stop").executes(context -> handleStop(context.getSource())))
+                .then(literal("pause").executes(context -> handlePause(context.getSource())))
+                .then(literal("resume").executes(context -> handleResume(context.getSource())))
+                .then(literal("countdown")
+                    .then(literal("get").executes(context -> {
+                        context.getSource().sendFeedback(new LiteralText("Counting down from " + Relay.countdown), false);
+                        return Relay.countdown;
+                    }))
+                    .then(literal("set")
+                        .then(argument("countdown", IntegerArgumentType.integer(0)).executes(context -> {
+                            Relay.countdown = IntegerArgumentType.getInteger(context, "countdown");
+                            context.getSource().sendFeedback(new LiteralText("Countdown set to " + Relay.countdown), false);
+                            return 1;
+                        })))));
+
+            dispatcher.register(literal("setvelocity")
+                .then(argument("entity", EntityArgumentType.entity())
+                    .then(argument("velocityX", DoubleArgumentType.doubleArg())
+                        .then(argument("velocityY", DoubleArgumentType.doubleArg())
+                            .then(argument("velocityZ", DoubleArgumentType.doubleArg()).executes(context -> {
+                                Entity entity = EntityArgumentType.getEntity(context, "entity");
+                                entity.setVelocity(
+                                    DoubleArgumentType.getDouble(context, "velocityX"),
+                                    DoubleArgumentType.getDouble(context, "velocityY"),
+                                    DoubleArgumentType.getDouble(context, "velocityZ"));
+                                entity.velocityModified = true;
+                                return 1;
+                            }))))));
         });
-        
+
         ServerLifecycleEvents.SERVER_STARTED.register(Relay::init);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> Relay.save());
-        
         ServerTickEvents.END_SERVER_TICK.register(Relay::tick);
-        
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            sender.sendPacket(new TitleFadeS2CPacket(0, 3, 0));
+            sender.sendPacket(new TitleS2CPacket(0, 3, 0));
             Relay.join(handler.player);
         });
     }
-    
+
+    private static int handleStart(ServerCommandSource source) {
+        switch (Relay.getCurrentState()) {
+            case BEFORE_START:
+                if (source.getMinecraftServer().getPlayerManager().getPlayerList().isEmpty()) {
+                    source.sendFeedback(new LiteralText("Relay cannot start because there is no players"), false);
+                    return 0;
+                }
+                Relay.start();
+                return 1;
+            case RUNNING:
+            case PAUSING:
+            case FORCED_PAUSING:
+                source.sendFeedback(new LiteralText("Relay has already started"), false);
+                return 0;
+            case ENDED:
+                source.sendFeedback(new LiteralText("Relay has already ended"), false);
+                return 0;
+            default:
+                return 0;
+        }
+    }
+
+    private static int handleStop(ServerCommandSource source) {
+        switch (Relay.getCurrentState()) {
+            case BEFORE_START:
+                source.sendFeedback(new LiteralText("Relay has not started yet"), false);
+                return 0;
+            case RUNNING:
+            case PAUSING:
+            case FORCED_PAUSING:
+                Relay.stop();
+                return 1;
+            case ENDED:
+                source.sendFeedback(new LiteralText("Relay has already ended"), false);
+                return 0;
+            default:
+                return 0;
+        }
+    }
+
+    private static int handlePause(ServerCommandSource source) {
+        switch (Relay.getCurrentState()) {
+            case BEFORE_START:
+                source.sendFeedback(new LiteralText("Relay has not started yet"), false);
+                return 0;
+            case RUNNING:
+                Relay.pause();
+                return 1;
+            case PAUSING:
+            case FORCED_PAUSING:
+                source.sendFeedback(new LiteralText("Relay has already paused"), false);
+                return 0;
+            case ENDED:
+                source.sendFeedback(new LiteralText("Relay has already ended"), false);
+                return 0;
+            default:
+                return 0;
+        }
+    }
+
+    private static int handleResume(ServerCommandSource source) {
+        switch (Relay.getCurrentState()) {
+            case BEFORE_START:
+                source.sendFeedback(new LiteralText("Relay has not started yet"), false);
+                return 0;
+            case RUNNING:
+                source.sendFeedback(new LiteralText("Relay is already running"), false);
+                return 0;
+            case PAUSING:
+                Relay.resume();
+                return 1;
+            case FORCED_PAUSING:
+                source.sendFeedback(new LiteralText("Relay cannot resume because the current player is not online"), false);
+                return 0;
+            case ENDED:
+                source.sendFeedback(new LiteralText("Relay has already ended"), false);
+                return 0;
+            default:
+                return 0;
+        }
+    }
 }
