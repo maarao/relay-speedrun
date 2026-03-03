@@ -259,6 +259,12 @@ public class Relay {
             return;
         }
 
+        Set<UUID> onlinePlayerUuids = new HashSet<UUID>();
+        for (ServerPlayerEntity player : players) {
+            onlinePlayerUuids.add(player.getUuid());
+        }
+        knownPlayers.retainAll(onlinePlayerUuids);
+
         for (ServerPlayerEntity player : players) {
             if (knownPlayers.add(player.getUuid())) {
                 join(player);
@@ -477,6 +483,7 @@ public class Relay {
         inheritSelectedHotbarSlot(player);
         inheritInventory(player);
         inheritEnderChestInventory(player);
+        inheritSpawnpoint(player);
         replaceShoulders(player);
         iterateEntities(player);
         if (!replaceRiding(player)) {
@@ -557,6 +564,15 @@ public class Relay {
             playereci.setStack(i, currenteci.getStack(i));
             currenteci.setStack(i, ItemStack.EMPTY);
         }
+    }
+
+    private static void inheritSpawnpoint(ServerPlayerEntity player) {
+        player.setSpawnPoint(
+            current.getSpawnPointDimension(),
+            current.getSpawnPointPosition(),
+            current.isSpawnPointSet(),
+            false
+        );
     }
 
     private static void replaceShoulders(ServerPlayerEntity player) {
